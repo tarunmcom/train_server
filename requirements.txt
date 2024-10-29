@@ -1,1 +1,5 @@
-
+git+https://github.com/tarunmcom/autotrain-advanced.git
+xformers
+boto3
+fastapi
+numpy==1.26.4
