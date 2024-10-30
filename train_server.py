@@ -41,7 +41,7 @@ DEFAULT_CONFIG = {
     "hf_token": "your_huggingface_token_here",
     "hf_username": "your_huggingface_username_here",
     "learning_rate": 1e-4,
-    "num_steps": 50,
+    "num_steps": 500,
     "batch_size": 1,
     "gradient_accumulation": 4,
     "resolution": 1024,
