@@ -41,7 +41,7 @@ DEFAULT_CONFIG = {
     "hf_token": "your_huggingface_token_here",
     "hf_username": "your_huggingface_username_here",
     "learning_rate": 1e-4,
-    "num_steps": 500,
+    "num_steps": 50,
     "batch_size": 1,
     "gradient_accumulation": 4,
     "resolution": 1024,
@@ -151,7 +151,7 @@ def upload_safetensor_to_s3(job_id, unique_user_id, project_name, training_args)
         # Create metadata JSON
         metadata = {
             "job_id": job_id,
-            "unique_user_id": unique_user_id,
+            "unique_user_id": str(unique_user_id),
             "project_name": project_name,
             "person_name": training_args["person_name"],
             "training_params": {
