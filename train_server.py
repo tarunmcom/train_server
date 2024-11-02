@@ -41,7 +41,7 @@ DEFAULT_CONFIG = {
     "hf_token": "your_huggingface_token_here",
     "hf_username": "your_huggingface_username_here",
     "learning_rate": 1e-4,
-    "num_steps": 500,
+    "num_steps": 25,
     "batch_size": 1,
     "gradient_accumulation": 4,
     "resolution": 1024,
@@ -241,7 +241,7 @@ def download_s3_images(bucket_name, s3_folder, local_dir=None):
 def call_callback_endpoint(job_id, project_name, s3_bucket, s3_folder, person_name, status, datetime, reason=None):
     callback_url = DEFAULT_CONFIG["callback_url"]
     payload = {
-        "job_id": job_id,
+        "job_id": str(job_id),  # Convert to string if it's a UUID
         "project_name": project_name,
         "s3_bucket": s3_bucket,
         "s3_folder": s3_folder,
@@ -251,6 +251,8 @@ def call_callback_endpoint(job_id, project_name, s3_bucket, s3_folder, person_na
         "reason": reason
     }
     try:
+        # Convert any UUID objects in the payload to strings
+        payload = {k: str(v) if isinstance(v, uuid.UUID) else v for k, v in payload.items()}
         response = requests.post(callback_url, json=payload)
         response.raise_for_status()
         logging.info(f"Callback sent successfully for job {job_id}")
