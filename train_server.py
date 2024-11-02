@@ -521,7 +521,7 @@ async def get_status(job_id: str):
     # Check for stalled training
     if (job_info.get("status") == "BUSY" and 
         "last_update" in job_info and 
-        datetime.now() - job_info["last_update"] > timedelta(minutes=5)):
+        datetime.now() - job_info["last_update"] > timedelta(minutes=55)):
         job_info["status"] = "STALLED"
         job_info["message"] = "Training appears to be stalled"
 
