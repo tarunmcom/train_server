@@ -23,6 +23,8 @@ from pydantic import BaseModel, UUID4, constr
 from typing import Optional, Dict, Any
 import uvicorn
 from pydantic import BaseModel, UUID4, Field, constr
+import torch
+import gc
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -341,27 +343,27 @@ def setup_training_args(args):
     return training_args
 
 def train_lora(job_id, args):
-    logging.info(f"Starting training for job {job_id}")
-    jobs[job_id]["status"] = "BUSY"
-    jobs[job_id]["stage"] = "downloading"
-    jobs[job_id]["message"] = "Downloading images from S3"
-    jobs[job_id]["start_time"] = datetime.now()
-    
-    # Download images from S3
-    local_image_folder = f"images_{job_id}"
-    s3_download_success = download_s3_images(args["s3_bucket"], args["s3_folder"], local_image_folder)
-    
-    if not s3_download_success:
-        jobs[job_id]["status"] = "FAILED"
-        jobs[job_id]["message"] = "Failed to download images from S3"
-        jobs[job_id]["stage"] = "download_failed"
-        return
-    
-    jobs[job_id]["status"] = "BUSY"
-    jobs[job_id]["stage"] = "training"
-    jobs[job_id]["message"] = "Training in progress"
-    
     try:
+        logging.info(f"Starting training for job {job_id}")
+        jobs[job_id]["status"] = "BUSY"
+        jobs[job_id]["stage"] = "downloading"
+        jobs[job_id]["message"] = "Downloading images from S3"
+        jobs[job_id]["start_time"] = datetime.now()
+        
+        # Download images from S3
+        local_image_folder = f"images_{job_id}"
+        s3_download_success = download_s3_images(args["s3_bucket"], args["s3_folder"], local_image_folder)
+        
+        if not s3_download_success:
+            jobs[job_id]["status"] = "FAILED"
+            jobs[job_id]["message"] = "Failed to download images from S3"
+            jobs[job_id]["stage"] = "download_failed"
+            return
+        
+        jobs[job_id]["status"] = "BUSY"
+        jobs[job_id]["stage"] = "training"
+        jobs[job_id]["message"] = "Training in progress"
+        
         # Set up training arguments
         training_args = setup_training_args(args)
         
@@ -409,18 +411,43 @@ def train_lora(job_id, args):
         call_callback_endpoint(job_id, args["project_name"], args["s3_bucket"], args["s3_folder"], 
                                args["person_name"], "FAILED", datetime.now().isoformat(), str(e))
     finally:
+        # Clean up training state
         if "training_state" in jobs[job_id]:
             jobs[job_id]["training_state"].is_training = False
+            
         # Clean up the local image folder
         if os.path.exists(local_image_folder):
             shutil.rmtree(local_image_folder)
-        logging.info(f"Cleaned up local image folder for job {job_id}")
+            logging.info(f"Cleaned up local image folder for job {job_id}")
 
         # Clean up the project folder
         project_folder = args["project_name"]
         if os.path.exists(project_folder):
             shutil.rmtree(project_folder)
-        logging.info(f"Cleaned up project folder for job {job_id}")
+            logging.info(f"Cleaned up project folder for job {job_id}")
+            
+        # Clean up CUDA cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            logging.info("Cleared CUDA cache")
+            
+        # Force garbage collection
+        gc.collect()
+        logging.info("Forced garbage collection")
+        
+        # Remove any temporary files in /tmp that might have been created
+        tmp_pattern = f"/tmp/*{job_id}*"
+        for tmp_file in glob.glob(tmp_pattern):
+            try:
+                if os.path.isfile(tmp_file):
+                    os.remove(tmp_file)
+                elif os.path.isdir(tmp_file):
+                    shutil.rmtree(tmp_file)
+                logging.info(f"Cleaned up temporary file/directory: {tmp_file}")
+            except Exception as e:
+                logging.warning(f"Failed to clean up temporary file/directory {tmp_file}: {str(e)}")
+                
+        logging.info(f"Completed cleanup for job {job_id}")
 
 # Pydantic models for request validation
 class TrainingRequest(BaseModel):
